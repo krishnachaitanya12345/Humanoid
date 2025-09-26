@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script">
+    <sys_script action="INSERT_OR_UPDATE">
+        <name>Non-Standard Software Request Auto-Trigger</name>
+        <description>Automatically triggers workflow for non-standard software requests</description>
+        <table>x_custom_software_request</table>
+        <when>after</when>
+        <order>100</order>
+        <condition>
+            request_type=non_standard^state=submitted
+        </condition>
+        <script><![CDATA[
+            (function executeRule(current, previous /*null when async*/) {
+                
+                // Validate that this is a new non-standard software request
+                if (current.request_type != 'non_standard' || current.state != 'submitted') {
+                    return;
+                }
+                
+                // Initialize the workflow process
+                try {
+                    gs.info('Starting non-standard software request workflow for: ' + current.number);
+                    
+                    // Set initial processing state
+                    current.state = 'processing';
+                    current.workflow_started = new GlideDateTime();
+                    current.update();
+                    
+                    // Start the workflow
+                    var workflow = new Workflow();
+                    workflow.startFlow('Non-Standard Software Request Workflow', current, current.operation());
+                    
+                    // Log workflow initiation
+                    gs.addInfoMessage('Non-standard software request workflow initiated for ' + current.software_name);
+                    
+                    // Create initial activity log entry
+                    var activityLog = new GlideRecord('sys_activity');
+                    activityLog.initialize();
+                    activityLog.table_name = 'x_custom_software_request';
+                    activityLog.table_sys_id = current.sys_id;
+                    activityLog.activity_type = 'workflow_started';
+                    activityLog.activity_date = new GlideDateTime();
+                    activityLog.activity_user = gs.getUserID();
+                    activityLog.activity_message = 'Workflow started for non-standard software request: ' + current.software_name;
+                    activityLog.insert();
+                    
+                } catch (error) {
+                    gs.error('Failed to start workflow for non-standard software request: ' + error.toString());
+                    
+                    // Set error state
+                    current.state = 'workflow_error';
+                    current.workflow_error = error.toString();
+                    current.update();
+                    
+                    // Create incident for workflow failure
+                    var incident = new GlideRecord('incident');
+                    incident.initialize();
+                    incident.short_description = 'Workflow failed to start for software request: ' + current.number;
+                    incident.description = 'Error: ' + error.toString();
+                    incident.priority = '2';
+                    incident.urgency = '2';
+                    incident.impact = '2';
+                    incident.assignment_group = 'Software Support';
+                    incident.caller_id = current.requested_by;
+                    incident.insert();
+                }
+                
+            })(current, previous);
+        ]]></script>
+        <active>true</active>
+        <advanced>true</advanced>
+        <change_fields>false</change_fields>
+        <client_callable>false</client_callable>
+        <collection>x_custom_software_request</collection>
+        <condition_checked>true</condition_checked>
+        <filter_condition>request_type=non_standard^state=submitted</filter_condition>
+        <is_rest>false</is_rest>
+        <max_seconds>30</max_seconds>
+        <name>Non-Standard Software Request Auto-Trigger</name>
+        <order>100</order>
+        <priority>100</priority>
+        <rest_method/>
+        <rest_method_text/>
+        <rest_service/>
+        <rest_service_text/>
+        <rest_variables/>
+        <role_conditions/>
+        <script><![CDATA[
+            (function executeRule(current, previous /*null when async*/) {
+                
+                // Validate that this is a new non-standard software request
+                if (current.request_type != 'non_standard' || current.state != 'submitted') {
+                    return;
+                }
+                
+                // Initialize the workflow process
+                try {
+                    gs.info('Starting non-standard software request workflow for: ' + current.number);
+                    
+                    // Set initial processing state
+                    current.state = 'processing';
+                    current.workflow_started = new GlideDateTime();
+                    current.update();
+                    
+                    // Start the workflow
+                    var workflow = new Workflow();
+                    workflow.startFlow('Non-Standard Software Request Workflow', current, current.operation());
+                    
+                    // Log workflow initiation
+                    gs.addInfoMessage('Non-standard software request workflow initiated for ' + current.software_name);
+                    
+                    // Create initial activity log entry
+                    var activityLog = new GlideRecord('sys_activity');
+                    activityLog.initialize();
+                    activityLog.table_name = 'x_custom_software_request';
+                    activityLog.table_sys_id = current.sys_id;
+                    activityLog.activity_type = 'workflow_started';
+                    activityLog.activity_date = new GlideDateTime();
+                    activityLog.activity_user = gs.getUserID();
+                    activityLog.activity_message = 'Workflow started for non-standard software request: ' + current.software_name;
+                    activityLog.insert();
+                    
+                } catch (error) {
+                    gs.error('Failed to start workflow for non-standard software request: ' + error.toString());
+                    
+                    // Set error state
+                    current.state = 'workflow_error';
+                    current.workflow_error = error.toString();
+                    current.update();
+                    
+                    // Create incident for workflow failure
+                    var incident = new GlideRecord('incident');
+                    incident.initialize();
+                    incident.short_description = 'Workflow failed to start for software request: ' + current.number;
+                    incident.description = 'Error: ' + error.toString();
+                    incident.priority = '2';
+                    incident.urgency = '2';
+                    incident.impact = '2';
+                    incident.assignment_group = 'Software Support';
+                    incident.caller_id = current.requested_by;
+                    incident.insert();
+                }
+                
+            })(current, previous);
+        ]]></script>
+        <sys_class_name>sys_script</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2023-01-01 00:00:00</sys_created_on>
+        <sys_id>nonsoftware001</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Non-Standard Software Request Auto-Trigger</sys_name>
+        <sys_package/>
+        <sys_policy/>
+        <sys_scope>global</sys_scope>
+        <sys_update_name>sys_script_nonsoftware001</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2023-01-01 00:00:00</sys_updated_on>
+        <template/>
+        <when>after</when>
+    </sys_script>
+</record_update>
