@@ -1,0 +1,170 @@
+{
+  "flow_name": "Non-Standard Software Request Flow",
+  "flow_description": "Automated workflow for processing non-standard software requests with Humanoid robot integration",
+  "version": "1.0.0",
+  "trigger": {
+    "type": "record_created",
+    "table": "x_custom_software_request",
+    "conditions": [
+      {
+        "field": "request_type",
+        "operator": "=",
+        "value": "non_standard"
+      },
+      {
+        "field": "state",
+        "operator": "=", 
+        "value": "submitted"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "stage_id": "1",
+      "name": "Initial Validation",
+      "type": "automated",
+      "actions": [
+        {
+          "type": "validate_request",
+          "script": "validateNonStandardRequest",
+          "timeout": 30
+        },
+        {
+          "type": "set_priority",
+          "script": "calculateRequestPriority",
+          "timeout": 10
+        }
+      ],
+      "next_stage": "2"
+    },
+    {
+      "stage_id": "2", 
+      "name": "Manager Approval",
+      "type": "approval",
+      "approver_type": "manager",
+      "approval_timeout": 72,
+      "escalation": {
+        "enabled": true,
+        "timeout_hours": 48,
+        "escalate_to": "department_head"
+      },
+      "next_stage_approved": "3",
+      "next_stage_rejected": "rejected"
+    },
+    {
+      "stage_id": "3",
+      "name": "Technical Review", 
+      "type": "approval",
+      "approver_type": "technical_team",
+      "approval_timeout": 48,
+      "actions": [
+        {
+          "type": "security_scan",
+          "script": "performSecurityAssessment",
+          "timeout": 300
+        },
+        {
+          "type": "compatibility_check",
+          "script": "checkSystemCompatibility", 
+          "timeout": 180
+        }
+      ],
+      "next_stage_approved": "4",
+      "next_stage_rejected": "rejected"
+    },
+    {
+      "stage_id": "4",
+      "name": "Procurement & Installation",
+      "type": "automated",
+      "actions": [
+        {
+          "type": "create_procurement_task",
+          "script": "createProcurementRequest",
+          "timeout": 60
+        },
+        {
+          "type": "schedule_installation", 
+          "script": "scheduleHumanoidInstallation",
+          "timeout": 120
+        },
+        {
+          "type": "notify_humanoid_system",
+          "script": "sendHumanoidCommand",
+          "timeout": 30,
+          "humanoid_integration": true
+        }
+      ],
+      "next_stage": "5"
+    },
+    {
+      "stage_id": "5",
+      "name": "Installation Execution",
+      "type": "automated",
+      "actions": [
+        {
+          "type": "humanoid_execute",
+          "script": "executeHumanoidInstallation",
+          "timeout": 1800,
+          "humanoid_integration": true,
+          "voice_command": "Install non-standard software package"
+        },
+        {
+          "type": "verify_installation",
+          "script": "verifyInstallation",
+          "timeout": 300
+        },
+        {
+          "type": "update_cmdb",
+          "script": "updateConfigurationDatabase",
+          "timeout": 60
+        }
+      ],
+      "next_stage": "6"
+    },
+    {
+      "stage_id": "6",
+      "name": "Post-Installation Validation",
+      "type": "automated", 
+      "actions": [
+        {
+          "type": "run_tests",
+          "script": "executePostInstallationTests",
+          "timeout": 600
+        },
+        {
+          "type": "generate_report",
+          "script": "generateInstallationReport",
+          "timeout": 120
+        },
+        {
+          "type": "notify_requestor",
+          "script": "sendCompletionNotification",
+          "timeout": 30
+        }
+      ],
+      "next_stage": "completed"
+    }
+  ],
+  "error_handling": {
+    "retry_attempts": 3,
+    "retry_delay": 300,
+    "failure_actions": [
+      {
+        "type": "create_incident",
+        "priority": "high",
+        "assignment_group": "software_support"
+      },
+      {
+        "type": "notify_stakeholders",
+        "recipients": ["requestor", "manager", "technical_team"]
+      }
+    ]
+  },
+  "humanoid_integration": {
+    "enabled": true,
+    "api_endpoint": "/api/humanoid/commands",
+    "authentication": "oauth2",
+    "voice_assistant": "google_assistant",
+    "iot_enabled": true
+  }
+}

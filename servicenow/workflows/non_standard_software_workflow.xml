@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="wf_workflow">
+    <wf_workflow action="INSERT_OR_UPDATE">
+        <name>Non-Standard Software Request Workflow</name>
+        <description>Automated workflow for processing non-standard software requests with Humanoid robot integration</description>
+        <table>x_custom_software_request</table>
+        <condition>
+            request_type=non_standard^state=submitted
+        </condition>
+        <active>true</active>
+        <published>true</published>
+        <on_cancel>do_nothing</on_cancel>
+        <workflow_version>1.0</workflow_version>
+    </wf_workflow>
+</record_update>
+
+<!-- Workflow Activities -->
+<record_update table="wf_activity">
+    <wf_activity action="INSERT_OR_UPDATE">
+        <name>Initial Validation</name>
+        <workflow>Non-Standard Software Request Workflow</workflow>
+        <activity_definition>com.glideapp.servicenow.script</activity_definition>
+        <order>100</order>
+        <script><![CDATA[
+            // Validate non-standard software request
+            function validateNonStandardRequest() {
+                var gr = current;
+                var validation = {
+                    valid: true,
+                    messages: []
+                };
+                
+                // Check required fields
+                if (!gr.software_name || gr.software_name == '') {
+                    validation.valid = false;
+                    validation.messages.push('Software name is required');
+                }
+                
+                if (!gr.business_justification || gr.business_justification == '') {
+                    validation.valid = false; 
+                    validation.messages.push('Business justification is required');
+                }
+                
+                if (!gr.requested_by || gr.requested_by == '') {
+                    validation.valid = false;
+                    validation.messages.push('Requestor information is required');
+                }
+                
+                // Set validation results
+                gr.validation_status = validation.valid ? 'passed' : 'failed';
+                gr.validation_notes = validation.messages.join('; ');
+                
+                if (validation.valid) {
+                    gr.state = 'pending_approval';
+                } else {
+                    gr.state = 'validation_failed';
+                }
+                
+                gr.update();
+                return validation.valid;
+            }
+            
+            validateNonStandardRequest();
+        ]]></script>
+    </wf_activity>
+</record_update>
+
+<record_update table="wf_activity">
+    <wf_activity action="INSERT_OR_UPDATE">
+        <name>Manager Approval</name>
+        <workflow>Non-Standard Software Request Workflow</workflow>
+        <activity_definition>com.glideapp.servicenow.approval</activity_definition>
+        <order>200</order>
+        <vars>
+            <approval_user>javascript:gs.getUserID()</approval_user>
+            <approval_timeout>72</approval_timeout>
+            <approval_action>approve</approval_action>
+        </vars>
+        <condition>validation_status=passed</condition>
+    </wf_activity>
+</record_update>
+
+<record_update table="wf_activity">
+    <wf_activity action="INSERT_OR_UPDATE">
+        <name>Technical Review</name>
+        <workflow>Non-Standard Software Request Workflow</workflow>
+        <activity_definition>com.glideapp.servicenow.approval</activity_definition>
+        <order>300</order>
+        <vars>
+            <approval_user>javascript:gs.getUser().getManager()</approval_user>
+            <approval_timeout>48</approval_timeout>
+        </vars>
+        <condition>approval=approved</condition>
+        <script><![CDATA[
+            // Perform security and compatibility checks
+            function performTechnicalReview() {
+                var gr = current;
+                
+                // Security assessment
+                var securityScore = performSecurityAssessment(gr.software_name, gr.vendor);
+                gr.security_score = securityScore;
+                
+                // Compatibility check  
+                var compatibility = checkSystemCompatibility(gr.software_name, gr.target_systems);
+                gr.compatibility_status = compatibility.status;
+                gr.compatibility_notes = compatibility.notes;
+                
+                // Set overall technical review status
+                if (securityScore >= 7 && compatibility.status == 'compatible') {
+                    gr.technical_review_status = 'approved';
+                    gr.state = 'technical_approved';
+                } else {
+                    gr.technical_review_status = 'requires_review';
+                    gr.state = 'technical_review_needed';
+                }
+                
+                gr.update();
+            }
+            
+            function performSecurityAssessment(softwareName, vendor) {
+                // Mock security assessment - in real implementation would integrate with security tools
+                var knownSecureVendors = ['Microsoft', 'Adobe', 'Oracle', 'IBM'];
+                return knownSecureVendors.includes(vendor) ? 8 : 6;
+            }
+            
+            function checkSystemCompatibility(softwareName, targetSystems) {
+                // Mock compatibility check - would integrate with CMDB and system inventory
+                return {
+                    status: 'compatible',
+                    notes: 'Software is compatible with target systems'
+                };
+            }
+            
+            performTechnicalReview();
+        ]]></script>
+    </wf_activity>
+</record_update>
+
+<record_update table="wf_activity">
+    <wf_activity action="INSERT_OR_UPDATE">
+        <name>Humanoid Installation</name>
+        <workflow>Non-Standard Software Request Workflow</workflow>
+        <activity_definition>com.glideapp.servicenow.script</activity_definition>
+        <order>400</order>
+        <condition>technical_review_status=approved</condition>
+        <script><![CDATA[
+            // Integrate with Humanoid robot for automated installation
+            function executeHumanoidInstallation() {
+                var gr = current;
+                
+                try {
+                    // Prepare Humanoid command
+                    var humanoidCommand = {
+                        action: 'install_software',
+                        software_name: gr.software_name.toString(),
+                        target_system: gr.target_systems.toString(),
+                        voice_command: 'Install ' + gr.software_name + ' on target system',
+                        iot_enabled: true,
+                        automation_level: 'full'
+                    };
+                    
+                    // Send command to Humanoid system
+                    var response = sendHumanoidCommand(humanoidCommand);
+                    
+                    if (response.success) {
+                        gr.installation_status = 'in_progress';
+                        gr.humanoid_task_id = response.task_id;
+                        gr.installation_start_time = new GlideDateTime();
+                        gr.state = 'installing';
+                        
+                        // Schedule follow-up check
+                        scheduleInstallationCheck(gr.sys_id, response.task_id);
+                    } else {
+                        gr.installation_status = 'failed';
+                        gr.installation_error = response.error;
+                        gr.state = 'installation_failed';
+                    }
+                    
+                } catch (error) {
+                    gr.installation_status = 'error';
+                    gr.installation_error = error.toString();
+                    gr.state = 'installation_error';
+                }
+                
+                gr.update();
+            }
+            
+            function sendHumanoidCommand(command) {
+                // Mock integration with Humanoid system
+                // In real implementation, this would make REST API calls to the Humanoid system
+                var rest = new sn_ws.RESTMessageV2();
+                rest.setEndpoint('https://humanoid-system.example.com/api/commands');
+                rest.setHttpMethod('POST');
+                rest.setRequestHeader('Content-Type', 'application/json');
+                rest.setRequestBody(JSON.stringify(command));
+                
+                try {
+                    var response = rest.execute();
+                    var responseBody = response.getBody();
+                    return JSON.parse(responseBody);
+                } catch (error) {
+                    return {
+                        success: false,
+                        error: 'Failed to communicate with Humanoid system: ' + error.toString()
+                    };
+                }
+            }
+            
+            function scheduleInstallationCheck(requestId, taskId) {
+                // Schedule a job to check installation status
+                var scheduler = new GlideScheduler();
+                scheduler.whenNext(300); // Check in 5 minutes
+                scheduler.setName('Check Humanoid Installation Status');
+                scheduler.setScript('checkHumanoidInstallationStatus("' + requestId + '", "' + taskId + '")');
+            }
+            
+            executeHumanoidInstallation();
+        ]]></script>
+    </wf_activity>
+</record_update>
+
+<record_update table="wf_activity">
+    <wf_activity action="INSERT_OR_UPDATE">
+        <name>Installation Completion</name>
+        <workflow>Non-Standard Software Request Workflow</workflow>
+        <activity_definition>com.glideapp.servicenow.script</activity_definition>
+        <order>500</order>
+        <condition>installation_status=completed</condition>
+        <script><![CDATA[
+            // Finalize installation and update records
+            function finalizeInstallation() {
+                var gr = current;
+                
+                // Update CMDB with new software
+                updateCMDB(gr);
+                
+                // Generate installation report
+                generateInstallationReport(gr);
+                
+                // Notify stakeholders
+                notifyStakeholders(gr);
+                
+                // Set final status
+                gr.state = 'completed';
+                gr.completion_time = new GlideDateTime();
+                gr.update();
+            }
+            
+            function updateCMDB(request) {
+                // Create or update CMDB records for installed software
+                var cmdb = new GlideRecord('cmdb_ci_software');
+                cmdb.initialize();
+                cmdb.name = request.software_name;
+                cmdb.version = request.software_version || '1.0';
+                cmdb.install_status = 'installed';
+                cmdb.installation_date = new GlideDateTime();
+                cmdb.installed_by = 'Humanoid Automation';
+                cmdb.insert();
+            }
+            
+            function generateInstallationReport(request) {
+                // Create installation report
+                var report = new GlideRecord('x_custom_installation_report');
+                report.initialize();
+                report.software_request = request.sys_id;
+                report.installation_date = new GlideDateTime();
+                report.status = 'success';
+                report.humanoid_task_id = request.humanoid_task_id;
+                report.notes = 'Successfully installed via Humanoid automation';
+                report.insert();
+            }
+            
+            function notifyStakeholders(request) {
+                // Send completion notification
+                var notification = new GlideRecord('sysevent');
+                notification.initialize();
+                notification.event_name = 'software_request_completed';
+                notification.instance = request.sys_id;
+                notification.insert();
+            }
+            
+            finalizeInstallation();
+        ]]></script>
+    </wf_activity>
+</record_update>
